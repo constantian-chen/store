@@ -1,0 +1,67 @@
+{
+  "react.react": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Solve the given competition-style math problem.\n\nRequirements:\n- Read the problem carefully and identify the requested final answer.\n- Use exact arithmetic whenever possible.\n- For fractions, reduce to lowest terms.\n- For modular/remainder questions, return the requested residue in the required format.\n- For counting, probability, algebra, and number theory problems, check constraints and edge cases.\n- The answer field must contain only the final answer, with no units or explanation.\n- Do not include LaTeX wrappers such as \\boxed{}, \\( ... \\), or $...$ unless the problem explicitly requires a symbolic expression.\n\nTool-use policy:\n- Use the provided fixed math tools for exact arithmetic, algebra, equations, combinatorics, number theory, polynomial roots, and modular arithmetic.\n- Use at least one tool call before giving the final answer.\n- If a tool returns an error, correct the arguments or choose a more appropriate tool.\n\nYou are an Agent. In each episode, you will be given the fields `problem` as input. And you can see your past trajectory so far.\nYour goal is to use one or more of the supplied tools to collect any necessary information for producing `reasoning`, `answer`.\n\nTo do this, you will interleave next_thought, next_tool_name, and next_tool_args in each turn, and also when finishing the task.\nAfter each tool call, you receive a resulting observation, which gets appended to your trajectory.\n\nWhen writing next_thought, you may reason about the current situation and plan for future steps.\nWhen selecting the next_tool_name and its next_tool_args, the tool must be one of:\n\n(1) calculator, whose description is <desc>Evaluate an arithmetic expression with exact rational arithmetic.</desc>. It takes arguments {'expression': {'type': 'string'}}.\n(2) solve_equation, whose description is <desc>Solve one equation for one variable. Use 'lhs = rhs' equation format.</desc>. It takes arguments {'equation': {'type': 'string'}, 'variable': {'type': 'string', 'default': 'x'}}.\n(3) solve_system, whose description is <desc>Solve equations separated by semicolons for comma-separated variables.</desc>. It takes arguments {'equations': {'type': 'string'}, 'variables': {'type': 'string'}}.\n(4) algebraic_manipulate, whose description is <desc>Apply one of factor, expand, or simplify to an algebraic expression.</desc>. It takes arguments {'expression': {'type': 'string'}, 'operation': {'type': 'string'}}.\n(5) number_theory, whose description is <desc>Run factorize, divisors, is_prime, or totient on an integer.</desc>. It takes arguments {'n': {'type': 'integer'}, 'operation': {'type': 'string'}}.\n(6) combinatorics, whose description is <desc>Run binomial, permutation, or factorial computations.</desc>. It takes arguments {'operation': {'type': 'string'}, 'n': {'type': 'integer'}, 'k': {'type': 'integer', 'default': 0}}.\n(7) polynomial_roots, whose description is <desc>Find roots of a polynomial from comma-separated high-to-low coefficients.</desc>. It takes arguments {'coefficients': {'type': 'string'}}.\n(8) modular_arithmetic, whose description is <desc>Run add, mul, pow, or inverse modulo mod.</desc>. It takes arguments {'a': {'type': 'integer'}, 'b': {'type': 'integer'}, 'mod': {'type': 'integer'}, 'operation': {'type': 'string'}}.\n(9) finish, whose description is <desc>Marks the task as complete. That is, signals that all information for producing the outputs, i.e. `reasoning`, `answer`, are now available to be extracted.</desc>. It takes arguments {}.\nWhen providing `next_tool_args`, the value inside the field must be in JSON format",
+      "fields": [
+        {
+          "prefix": "Problem:",
+          "description": "Mathematical problem statement"
+        },
+        {
+          "prefix": "Trajectory:",
+          "description": "${trajectory}"
+        },
+        {
+          "prefix": "Next Thought:",
+          "description": "${next_thought}"
+        },
+        {
+          "prefix": "Next Tool Name:",
+          "description": "${next_tool_name}"
+        },
+        {
+          "prefix": "Next Tool Args:",
+          "description": "${next_tool_args}"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "react.extract.predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Instructions for solving competition-style math problems with the fixed tools\n\n1) Read and parse the problem carefully\n- Identify exactly what the final answer must be (e.g., a number, a residue class, a product like mn).\n- Check for hidden or implicit definitions (e.g., functions f(n) that might be defined earlier). If a function is not explicitly defined, infer the most standard interpretation used in competition problems (see section 4 for common patterns).\n- Note all constraints (“for all integers n”, “vertices are distinguishable”, etc.) and structural properties of the object (e.g., regular polygons, domino tilings, primes).\n\n2) Computation and exactness rules\n- Use exact arithmetic. Reduce fractions to lowest terms.\n- For modular problems, return the correct residue in the requested format (typically a least nonnegative residue unless specified otherwise).\n- For counting/probability/algebra/NT, check edge cases and constraints thoroughly to avoid overcounting or missing cases.\n\n3) Tool-use policy (mandatory)\n- You must make at least one valid tool call before providing the final answer.\n- Use the tools with correct argument names and supported operations. If a tool returns Error:, correct the arguments or use a different tool.\n  - calculator: use the single string argument \"expression\", e.g., {\"expression\": \"4 * 41 - 11\"}.\n  - modular_arithmetic: supports modular operations; for exponentiation use {\"a\": base, \"b\": exponent, \"mod\": m, \"operation\": \"pow\"}.\n  - number_theory: supports {\"n\": value, \"operation\": \"factorize\" | \"is_prime\" | \"totient\" | \"divisors\"}.\n- Even if the reasoning is straightforward, verify a key arithmetic step with a tool (e.g., final multiplication, modular power, or LCM).\n\n4) Domain-specific strategies and common patterns\nA) Periodicity problems of the form “Find the minimum positive k such that f(n+k) ≡ f(n) (mod m) for all integers n”\n- Always use the universal quantifier “for all n” to derive necessary divisibility conditions by choosing convenient n (e.g., n ≡ 0 mod m forces base terms to align).\n- If f(n) is linear: f(n) = a n + b. Then k must satisfy a k ≡ 0 (mod m); minimal k = m / gcd(a, m).\n- If f(n) = a^n (a fixed base, gcd(a, m)=1): k is the multiplicative order of a modulo m. Use number_theory.totient to get φ(m), and test divisors of φ(m) with modular_arithmetic pow.\n- If f(n) = n^n modulo a prime p:\n  - Handle n ≡ 0 (mod p): this forces p | k so base cases match (0 vs nonzero).\n  - For n coprime to p, reduce exponents modulo φ(p)=p−1. Since the exponent also depends on n, the period must also synchronize modulo p−1. This often forces p−1 | k.\n  - If the exponent itself contains n (like n^n), further reduce modulo φ(p−1) (and continue iterating φ if the dependency persists). For p=23, φ(23)=22 and φ(22)=10, so k must be a multiple of lcm(23, 22, 10) = 2530. Verify sufficiency by confirming that these divisibility conditions make f(n+k) ≡ f(n) for all n, and assert minimality via LCM.\n- Combine all necessary cycles via LCM and confirm minimality.\n\nB) Domino tilings of a 3×n rectangle with 1×2 dominoes\n- Tiling exists only for even n; for odd n the count is 0.\n- Use the standard recurrence for even n:\n  - a_0 = 1, a_2 = 3, and for n ≥ 4 even: a_n = 4 a_{n−2} − a_{n−4}.\n- Compute the desired term iteratively and verify arithmetic with the calculator tool.\n\nC) Vertex colorings on regular polygons with extra constraints\n- For a regular nonagon (9-gon), the sets {i, i+3, i+6} (indices modulo 9) are exactly the triples forming equilateral triangles. These three triples are disjoint and partition the vertices into residues modulo 3.\n- Minimum colors:\n  - Not bipartite (odd cycle), so at least 3 colors.\n  - With 3 colors, each equilateral triangle must be assigned 3 distinct colors.\n- Counting colorings with m fixed labeled colors and distinguishable vertices:\n  - Be explicit about whether colors are considered distinct (labeled) and whether vertices are distinguishable. If vertices are distinguishable and colors labeled, permutations on an initial triple count distinctly (e.g., 3! for the first triangle).\n  - Carefully propagate adjacency and triangle constraints around the cycle. Do not assume a bijection to Latin squares unless you verify all wrap-around adjacency constraints. If you use a structure (like partitioning by residues modulo 3), perform precise casework to account for forced choices and remaining degrees of freedom.\n  - Cross-check counts by symmetric cases and ensure no overcounting.\n\n5) Verification and minimality\n- When showing that a k works, also argue that no smaller k works (e.g., by considering divisors or adversarial choices of n).\n- For counting problems, verify small cases or subcounts consistently, and, if possible, validate with a quick computation tool for final arithmetic.\n\n6) Output formatting\n- The answer field must contain only the final answer, with no units or explanation.\n- Do not include LaTeX wrappers or any extra text.\n- Ensure the final numeric value matches the required format (reduced fraction, integer, or specified residue).\n\n7) Common pitfalls to avoid (based on prior errors)\n- Do not pass unsupported argument names to tools (e.g., calculator does not accept “operation”).\n- Do not rely on an assumed combinatorial correspondence (e.g., to Latin squares) without checking all problem-specific constraints, especially wrap-around adjacencies on cycles.\n- For “for all n” modular periodicity, do not guess the function f(n); look for standard interpretations (especially f(n) = n^n in these contexts), and derive necessary divisibility via strategically chosen n, using φ (Euler’s totient) iteratively when exponents depend on n.\n\nExample tool uses\n- Verify arithmetic: calculator {\"expression\": \"4*41 - 11\"} -> 153\n- Verify modular order or residues: modular_arithmetic {\"a\": 2, \"b\": 11, \"mod\": 23, \"operation\": \"pow\"} -> 1\n- Compute totient: number_theory {\"n\": 22, \"operation\": \"totient\"} -> 10\n\nFollow these steps, make at least one successful tool call, and then output only the final answer.",
+      "fields": [
+        {
+          "prefix": "Problem:",
+          "description": "Mathematical problem statement"
+        },
+        {
+          "prefix": "Trajectory:",
+          "description": "${trajectory}"
+        },
+        {
+          "prefix": "Reasoning:",
+          "description": "Step-by-step reasoning and tool-use summary"
+        },
+        {
+          "prefix": "Answer:",
+          "description": "Final answer only"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.2.0",
+      "cloudpickle": "3.1"
+    }
+  }
+}
